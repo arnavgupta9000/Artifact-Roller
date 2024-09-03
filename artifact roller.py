@@ -248,32 +248,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-'''
-
-def roll_odds(self, num, var = True):
-        for i in range(num):
-            # difference in i=1 as nothing in the pool
-            if i == 0 and var:
-                self.random_stat = random.choice(list(self.possible_stats.keys()))
-                while self.random_stat == self.main:
-                    self.random_stat = random.choice(list(self.possible_stats.keys()))
-                self.substats.append(self.random_stat)
-
-            else:
-                self.others = 0
-                for j in self.substats:
-                    self.others += self.possible_stats[j]
-                print(self.others)
-                self.chances = [] # list of percentages
-                for j in self.possible_stats.keys():
-                    if j in self.substats or j == self.main:
-                        continue
-                    self.chances.append([j, self.possible_stats[j] / (self.others)])
-                print(self.chances)
-                return
-                stats = [item[0] for item in self.chances]
-                probs = [item[1] for item in self.chances]
-                # Use random.choices to pick based on the probabilities
-                self.substats.append(random.choices(stats, weights=probs, k=1)[0]) # [0] cause random.choices still returns a list
-'''
