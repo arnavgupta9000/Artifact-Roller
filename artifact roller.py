@@ -1,4 +1,74 @@
 import random
+import sqlite3
+import hashlib
+
+class Login(object):
+
+    def __init__(self):
+        self.create_db()
+        self.choice = input("1.Login 2.Register\n").strip()
+        while self.choice not in ['1','2']:
+            self.choice = input("1.Login 2.Register\n").strip()
+
+        username = input("username")
+        password = input("password")
+
+        self.login(username, password) if self.choice == '1' else self.register(username, password)
+            
+
+    def create_db(self):
+        connection = sqlite3.connect('users.db')
+        cursor = connection.cursor()
+
+        cursor.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            '''
+            )
+    
+        connection.commit()
+        connection.close()
+
+    def register(self, username, password):
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
+        try: 
+            cursor.execute("Insert Into users (username, password) Values (?, ?)", (username, hashed_password))
+            conn.commit()
+            print('User registered')
+        except:
+            print("username is already taken")
+        
+        finally:
+            cursor.close()
+            conn.close()
+    
+    def login(self, username, password):
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
+        cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, hashed_password))
+        user = cursor.fetchone()
+
+        if user:
+            print("Login successful!")
+        else:
+            print("Invalid username or password.")
+
+        cursor.close()
+        conn.close()
+
+
 
 class Artifact(object):
 
@@ -188,7 +258,7 @@ class Roll(object):
                 setattr(self, gear_map[gear], artifact)
             elif gear == "circlet":
                 if artifact.crit_value("Cr") > current_gear.crit_value(current_gear.main) or artifact.crit_value("Cd") > current_gear.crit_value(current_gear.main):
-                    setattr(self, "circlet", artifact)
+                    setattr(self, "circlet", artifact) # self.circlet = artifact
             
             elif gear == "goblet":
                 if artifact.crit_value("Pyro DMG Bonus%") > current_gear.crit_value(current_gear.main):
@@ -218,7 +288,6 @@ class Roll(object):
             print(f"Total {key} is {value + x:.2f}{add}")
             
 
-
     def loop(self):
         for _ in range(0, self.times):
             self.in_roll()
@@ -241,8 +310,10 @@ class Roll(object):
         
 
 def main(): 
+    login = Login()
     roll = Roll(200)
     roll.loop()
+
         
 
 if __name__ == "__main__":
