@@ -10,15 +10,17 @@ class Login(object):
         while self.choice not in ['1','2']:
             self.choice = input("1.Login 2.Register\n").strip()
 
-        username = input("username")
-        password = input("password")
+        self.username = input("username\n")
+        self.password = input("password\n")
 
-        self.login(username, password) if self.choice == '1' else self.register(username, password)
-            
+        self.login(self.username, self.password) if self.choice == '1' else self.register(self.username, self.password)
+        
+        self.menu()
 
     def create_db(self):
         connection = sqlite3.connect('users.db')
         cursor = connection.cursor()
+        # cursor.execute("DROP TABLE IF EXISTS users") need this to update
 
         cursor.execute(
             '''
@@ -26,6 +28,7 @@ class Login(object):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
+            resin_used INT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             '''
@@ -69,10 +72,56 @@ class Login(object):
         conn.close()
 
 
+    def menu(self):
+        choice = input("1. View resin spent \n2.Roll 200 times\n")
+        if choice == '1':
+            conn = sqlite3.connect('users.db')
+            cursor = conn.cursor()
+
+            # get the resin
+            result = cursor.execute("SELECT resin_used FROM users WHERE username = ?", (self.username,)).fetchone()[0]
+            print(f"You have spent a total of {result} resin")
+            cursor.close()
+            conn.close()
+        elif choice == '2':
+            while True:
+                try:
+                    amount = int(input("How many times would you like to roll\n"))
+                    if amount > 0 and amount < 50000:
+                        break
+                    else:
+                        print("Enter a valid number (greater than 0, less than 50000)")
+                except ValueError:
+                    print("Please enter a valid integer.")
+
+            self.add_resin(amount * 20)
+            roll = Roll(amount, self.username)
+            roll.loop()
+        
+        self.menu()
+        
+
+    def add_resin(self, amount):
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+
+        # get the resin
+        result = cursor.execute("SELECT resin_used FROM users WHERE username = ?", (self.username,)).fetchone()[0]
+        # update the resin amount
+        if result is None:
+            result = 0
+        cursor.execute("UPDATE users SET resin_used = ? where username = ?", (result + amount, self.username))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"resin before is {result} and updated resin is {result + amount}")
+        
+    
+
 
 class Artifact(object):
 
-    def __init__ (self,artifact):
+    def __init__ (self,artifact,login):
         self.main = None
         self.substats = []
         self.possible_stats = {"Hp": 6, "Atk": 6, "Def": 6, "Hp%": 4, "Atk%": 4, "Def%": 4, "Er": 4, "Em": 4, "Cr": 3, "Cd": 3} # weights of the substats
@@ -81,6 +130,7 @@ class Artifact(object):
         self.level = 0
         self.artifact = artifact
         self.path = {}
+        self.login = login
         artifact_methods = {'flower': self.generate_flower, 'feather': self.generate_feather, 'sands': self.generate_sands, 'goblet': self.generate_goblet, 'circlet': self.generate_circlet}
         artifact_methods.get(artifact)() # need the brackets here not in the dict - error
         self.convert()
@@ -230,12 +280,13 @@ class Artifact(object):
 
 class Roll(object):
 
-    def __init__(self, times, goblet_main =None, circlet_main=None):
+    def __init__(self, times, login, goblet_main =None, circlet_main=None):
         self.flower = None
         self.feather = None
         self.sands = None
         self.goblet = None
         self.circlet = None
+        self.login = login
         self.times = times
         self.stats = {"Cr": 0, "Cd": 0, "Er": 0, "Em": 0}
         self.goblet_main = goblet_main
@@ -247,7 +298,7 @@ class Roll(object):
 
     def in_roll(self):
         gear = self.roller()
-        artifact = Artifact(gear)
+        artifact = Artifact(gear,self.login)
         if len(artifact.substats ) <= 3:
             print(artifact)
             exit() 
@@ -311,8 +362,8 @@ class Roll(object):
 
 def main(): 
     login = Login()
-    roll = Roll(200)
-    roll.loop()
+    # roll = Roll(200, login)
+    # roll.loop()
 
         
 
