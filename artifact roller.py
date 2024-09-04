@@ -6,6 +6,53 @@ class Login(object):
 
     def __init__(self):
         self.create_db()
+        self.info()
+        while not (self.login(self.username, self.password) if self.choice == '1' else self.register(self.username, self.password)):
+            self.info()
+        self.menu()
+    
+    def drop(self):
+        connection = sqlite3.connect('users.db')
+        cursor = connection.cursor()
+        cursor.execute("DROP TABLE IF EXISTS users")
+        cursor.execute("DROP TABLE IF EXISTS feathers")
+
+    def create_db(self):
+        connection = sqlite3.connect('users.db')
+        cursor = connection.cursor()
+        #self.drop() #need this to update
+
+        cursor.execute(
+            '''CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            resin_used INT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+            '''
+            )
+        
+
+        cursor.execute(
+            ''' 
+            CREATE TABLE IF NOT EXISTS feathers (
+            user_id TEXT PRIMARY KEY NOT NULL, -- this is the same as username in users table
+            main_stat TEXT DEFAULT 'atk',
+            substat_1_name TEXT NOT NULL,
+            substat_1_value FLOAT NOT NULL,
+            substat_2_name TEXT NOT NULL,
+            substat_2_value FLOAT NOT NULL,
+            substat_3_name TEXT NOT NULL,
+            substat_3_value FLOAT NOT NULL,
+            substat_4_name TEXT NOT NULL,
+            substat_4_value FLOAT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(username) ON DELETE CASCADE
+            )
+            '''
+        )
+        connection.commit()
+        connection.close()
+    
+    def info(self):
         self.choice = input("1.Login 2.Register\n").strip()
         while self.choice not in ['1','2']:
             self.choice = input("1.Login 2.Register\n").strip()
@@ -13,31 +60,8 @@ class Login(object):
         self.username = input("username\n")
         self.password = input("password\n")
 
-        self.login(self.username, self.password) if self.choice == '1' else self.register(self.username, self.password)
-        
-        self.menu()
-
-    def create_db(self):
-        connection = sqlite3.connect('users.db')
-        cursor = connection.cursor()
-        # cursor.execute("DROP TABLE IF EXISTS users") need this to update
-
-        cursor.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            resin_used INT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            '''
-            )
-    
-        connection.commit()
-        connection.close()
-
     def register(self, username, password):
+        success = False
         conn = sqlite3.connect('users.db')
         cursor = conn.cursor()
 
@@ -47,14 +71,17 @@ class Login(object):
             cursor.execute("Insert Into users (username, password) Values (?, ?)", (username, hashed_password))
             conn.commit()
             print('User registered')
+            success = True
         except:
             print("username is already taken")
         
         finally:
             cursor.close()
             conn.close()
+            return success
     
     def login(self, username, password):
+        success = False
         conn = sqlite3.connect('users.db')
         cursor = conn.cursor()
 
@@ -65,15 +92,17 @@ class Login(object):
 
         if user:
             print("Login successful!")
+            success = True
         else:
             print("Invalid username or password.")
 
         cursor.close()
         conn.close()
+        return success
 
 
     def menu(self):
-        choice = input("1. View resin spent \n2.Roll 200 times\n")
+        choice = input("1. View resin spent \n2.Roll 200 times\n3. View best feather\n")
         if choice == '1':
             conn = sqlite3.connect('users.db')
             cursor = conn.cursor()
@@ -98,6 +127,11 @@ class Login(object):
             roll = Roll(amount, self.username)
             roll.loop()
         
+        elif choice == '3':
+            self.view_artifacts('feathers')
+            if result is None:
+                print("No feather currently saved")
+        
         self.menu()
         
 
@@ -116,6 +150,22 @@ class Login(object):
         conn.close()
         print(f"resin before is {result} and updated resin is {result + amount}")
         
+    
+    def view_artifacts(self,artifact):
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+        query = f'''
+                SELECT main_stat, substat_1_name, substat_1_value, 
+                substat_2_name, substat_2_value,
+                substat_3_name, substat_3_value,
+                substat_4_name, substat_4_value
+                FROM {artifact}
+                WHERE user_id = ?
+                '''
+        result = cursor.execute(query, (self.username,)).fetchall()
+        cursor.close()
+        conn.close()
+        return result
     
 
 
