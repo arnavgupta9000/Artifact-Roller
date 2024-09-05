@@ -5,22 +5,26 @@ import hashlib
 class Login(object):
 
     def __init__(self):
+        # self.drop()
         self.create_db()
         self.info()
         while not (self.login(self.username, self.password) if self.choice == '1' else self.register(self.username, self.password)):
             self.info()
-        self.menu()
     
     def drop(self):
         connection = sqlite3.connect('users.db')
         cursor = connection.cursor()
         cursor.execute("DROP TABLE IF EXISTS users")
+        cursor.execute("DROP TABLE IF EXISTS feather")
         cursor.execute("DROP TABLE IF EXISTS feathers")
+        cursor.close()
+        connection.close()
+
+
 
     def create_db(self):
         connection = sqlite3.connect('users.db')
         cursor = connection.cursor()
-        #self.drop() #need this to update
 
         cursor.execute(
             '''CREATE TABLE IF NOT EXISTS users (
@@ -34,7 +38,7 @@ class Login(object):
 
         cursor.execute(
             ''' 
-            CREATE TABLE IF NOT EXISTS feathers (
+            CREATE TABLE IF NOT EXISTS feather (
             user_id TEXT PRIMARY KEY NOT NULL, -- this is the same as username in users table
             main_stat TEXT DEFAULT 'atk',
             substat_1_name TEXT NOT NULL,
@@ -124,13 +128,15 @@ class Login(object):
                     print("Please enter a valid integer.")
 
             self.add_resin(amount * 20)
-            roll = Roll(amount, self.username)
+            roll = Roll(amount, self.username, self)
             roll.loop()
         
         elif choice == '3':
-            self.view_artifacts('feathers')
+            result = self.view_artifacts('feather')
             if result is None:
                 print("No feather currently saved")
+            else:
+                print(result)
         
         self.menu()
         
@@ -151,21 +157,66 @@ class Login(object):
         print(f"resin before is {result} and updated resin is {result + amount}")
         
     
-    def view_artifacts(self,artifact):
-        conn = sqlite3.connect('users.db')
+    def view_artifacts(self,name):
+        conn = sqlite3.connect(f'users.db')
         cursor = conn.cursor()
         query = f'''
                 SELECT main_stat, substat_1_name, substat_1_value, 
                 substat_2_name, substat_2_value,
                 substat_3_name, substat_3_value,
                 substat_4_name, substat_4_value
-                FROM {artifact}
+                FROM {name}
                 WHERE user_id = ?
                 '''
         result = cursor.execute(query, (self.username,)).fetchall()
+
         cursor.close()
         conn.close()
         return result
+
+    def save_artifacts(self, name, artifact):
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+
+        query = f'''
+                UPDATE {name} 
+                SET main_stat = ?,
+                    substat_1_name = ?, substat_1_value = ?, 
+                    substat_2_name = ?, substat_2_value = ?, 
+                    substat_3_name = ?, substat_3_value = ?, 
+                    substat_4_name = ?, substat_4_value = ?
+                WHERE user_id = ?
+                '''
+        li = []
+        for key,value in artifact.stats.items():
+            li.append([key, value])
+        values = (artifact.main,
+            li[0][0], li[0][1], 
+            li[1][0], li[1][1], 
+            li[2][0], li[2][1], 
+            li[3][0], li[3][1], 
+            self.username 
+        )
+        if self.view_artifacts(name) == []:
+            print('in')
+            query = '''
+                    INSERT INTO feather
+                    (main_stat, 
+                    substat_1_name, substat_1_value, 
+                    substat_2_name, substat_2_value, 
+                    substat_3_name, substat_3_value, 
+                    substat_4_name, substat_4_value,
+                    user_id) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                '''
+            cursor.execute(query, values).fetchall()
+            conn.commit()
+        else:
+            cursor.execute(query, values)
+            conn.commit()
+
+        cursor.close()
+        conn.close()
     
 
 
@@ -188,6 +239,10 @@ class Artifact(object):
        
         self.main_stats = { "Hp": 4780, "Atk": 311, "Hp%": 46.6, "Atk%": 46.6, "Def%": 58.3, "Em": 186.5, "Er": 51.8, "Pyro DMG Bonus%": 46.6, "Hydro DMG Bonus%": 46.6, "Electro DMG Bonus%": 46.6, "Cryo DMG Bonus%": 46.6, "Geo DMG Bonus%": 46.6, "Dendro DMG Bonus%": 46.6, "Anemo DMG Bonus%": 46.6, "Physical DMG Bonus%": 58.3, "Cr": 31.1, "Cd": 62.2, "Healing Bonus%": 35.9 }
         self.main_d = {self.main: self.main_stats[self.main]}
+    
+
+    def login_setup(self, var):
+         self.log = var
     
 
     def generate_flower(self):
@@ -330,7 +385,8 @@ class Artifact(object):
 
 class Roll(object):
 
-    def __init__(self, times, login, goblet_main =None, circlet_main=None):
+    def __init__(self, times, login, login_class, goblet_main =None, circlet_main=None):
+        self.login_class = login_class
         self.flower = None
         self.feather = None
         self.sands = None
@@ -408,14 +464,12 @@ class Roll(object):
         self.total_stats(self.goblet) if self.goblet is not None else None
         self.total_stats(self.circlet) if self.circlet is not None else None
         self.end_stats()
+        self.login_class.save_artifacts('feather', self.feather)
         
 
 def main(): 
     login = Login()
-    # roll = Roll(200, login)
-    # roll.loop()
-
-        
+    login.menu()
 
 if __name__ == "__main__":
     main()
