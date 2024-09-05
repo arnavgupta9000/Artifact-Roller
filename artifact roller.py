@@ -41,6 +41,7 @@ class Login(object):
             CREATE TABLE IF NOT EXISTS feather (
             user_id TEXT PRIMARY KEY NOT NULL, -- this is the same as username in users table
             main_stat TEXT DEFAULT 'atk',
+            main_stat_value FLOAT NOT NULL,
             substat_1_name TEXT NOT NULL,
             substat_1_value FLOAT NOT NULL,
             substat_2_name TEXT NOT NULL,
@@ -49,6 +50,7 @@ class Login(object):
             substat_3_value FLOAT NOT NULL,
             substat_4_name TEXT NOT NULL,
             substat_4_value FLOAT NOT NULL,
+            crit_value FLOAT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(username) ON DELETE CASCADE
             )
             '''
@@ -106,7 +108,7 @@ class Login(object):
 
 
     def menu(self):
-        choice = input("1. View resin spent \n2.Roll 200 times\n3. View best feather\n")
+        choice = input("1. View resin spent \n2. Roll n times\n3. View best feather\n")
         if choice == '1':
             conn = sqlite3.connect('users.db')
             cursor = conn.cursor()
@@ -120,10 +122,10 @@ class Login(object):
             while True:
                 try:
                     amount = int(input("How many times would you like to roll\n"))
-                    if amount > 0 and amount < 50000:
+                    if amount > 0 and amount < 5000000:
                         break
                     else:
-                        print("Enter a valid number (greater than 0, less than 50000)")
+                        print("Enter a valid number (greater than 0, less than 5000000)")
                 except ValueError:
                     print("Please enter a valid integer.")
 
@@ -133,10 +135,13 @@ class Login(object):
         
         elif choice == '3':
             result = self.view_artifacts('feather')
-            if result is None:
+            if not result:
                 print("No feather currently saved")
             else:
                 print(result)
+                print(f"Feather Main: {result[0][1]} {result[0][0]} CV: {result[0][-1]}")
+                for i in range(2, len(result[0]) - 1, 2):
+                    print(f"{result[0][i]}:{result[0][i+1]: .2f}")
         
         self.menu()
         
@@ -161,10 +166,12 @@ class Login(object):
         conn = sqlite3.connect(f'users.db')
         cursor = conn.cursor()
         query = f'''
-                SELECT main_stat, substat_1_name, substat_1_value, 
+                SELECT main_stat, main_stat_value,
+                substat_1_name, substat_1_value, 
                 substat_2_name, substat_2_value,
                 substat_3_name, substat_3_value,
-                substat_4_name, substat_4_value
+                substat_4_name, substat_4_value,
+                crit_value
                 FROM {name}
                 WHERE user_id = ?
                 '''
@@ -180,34 +187,35 @@ class Login(object):
 
         query = f'''
                 UPDATE {name} 
-                SET main_stat = ?,
+                SET main_stat = ?, main_stat_value = ?,
                     substat_1_name = ?, substat_1_value = ?, 
                     substat_2_name = ?, substat_2_value = ?, 
                     substat_3_name = ?, substat_3_value = ?, 
-                    substat_4_name = ?, substat_4_value = ?
+                    substat_4_name = ?, substat_4_value = ?,
+                    crit_value = ?
                 WHERE user_id = ?
                 '''
         li = []
         for key,value in artifact.stats.items():
             li.append([key, value])
-        values = (artifact.main,
+        values = (artifact.main, artifact.main_stats[artifact.main],
             li[0][0], li[0][1], 
             li[1][0], li[1][1], 
             li[2][0], li[2][1], 
             li[3][0], li[3][1], 
+            artifact.crit_value(artifact.main),
             self.username 
         )
         if self.view_artifacts(name) == []:
-            print('in')
             query = '''
                     INSERT INTO feather
-                    (main_stat, 
+                    (main_stat, main_stat_value,
                     substat_1_name, substat_1_value, 
                     substat_2_name, substat_2_value, 
                     substat_3_name, substat_3_value, 
                     substat_4_name, substat_4_value,
-                    user_id) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    crit_value, user_id) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
                 '''
             cursor.execute(query, values).fetchall()
             conn.commit()
