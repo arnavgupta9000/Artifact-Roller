@@ -155,14 +155,13 @@ class Login(object):
             choice = input("Which artifact would you like to see? type 'all' to see all your best artifacts\n").lower().strip()
             while choice not in ['flower', 'feather', 'sands', 'goblet', 'circlet']:
                     choice = input("Which artifact would you like to save? Make sure you spell it correctly!\n").lower().strip()
-            result = self.view_artifacts(self.options_for_artifacts[choice])
+            result = self.view_artifacts(self.options_for_artifacts[choice],True)
             if not result:
                 print(f"No {choice} currently saved")
             else:
-                print(result)
-                print(f"\n{choice.capitalize()} Main: {result[0][1]} {result[0][0]} CV: {result[0][-1]}")
-                for i in range(2, len(result[0]) - 1, 2):
-                    print(f"{result[0][i]}:{result[0][i+1]: .2f}")
+                print(f"\n{choice.capitalize()} Main: {result[2]} {result[3]} CV: {result[-1]}")
+                for i in range(4, len(result) - 1, 2):
+                    print(f"{result[i]}:{result[i+1]: .2f}")
         
         self.menu()
         
@@ -183,24 +182,30 @@ class Login(object):
         print(f"resin before is {result} and updated resin is {result + amount}")
         
     
-    def view_artifacts(self,name):
+    def view_artifacts(self,name, viewer = False):
         conn = sqlite3.connect(f'users.db')
         cursor = conn.cursor()
-        if name == 'feather' or name == 'flower':
-            result = cursor.execute(f"SELECT * FROM {name} WHERE user_id = ? ORDER BY crit_value DESC LIMIT 1", (self.username,)).fetchone()
-            print(result)
+        if viewer:
+            if name == 'feather' or name == 'flower':
+                search = 'Atk' if name == 'feather' else 'Hp'
+            else:
+                choice = input("What main stat would you like to see that has the best CV\n")
+                search = choice
+            result = cursor.execute(f'''SELECT * FROM {name} WHERE user_id = ? 
+                                    ORDER BY 
+                                        CASE WHEN main_stat = ? THEN 1 ELSE 0 END DESC, 
+                                        crit_value DESC  
+                                    LIMIT 1''', (self.username, search)).fetchone()
+                        
         else:
             query = f'''
-                    SELECT main_stat, main_stat_value,
-                    substat_1_name, substat_1_value, 
-                    substat_2_name, substat_2_value,
-                    substat_3_name, substat_3_value,
-                    substat_4_name, substat_4_value,
-                    crit_value
+                    SELECT *
                     FROM {name}
                     WHERE user_id = ?
                     '''
             result = cursor.execute(query, (self.username,)).fetchall()
+
+        
 
         cursor.close()
         conn.close()
