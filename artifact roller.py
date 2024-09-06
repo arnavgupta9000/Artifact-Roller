@@ -159,7 +159,8 @@ class Login(object):
             if not result:
                 print(f"No {choice} currently saved")
             else:
-                print(f"{choice} Main: {result[0][1]} {result[0][0]} CV: {result[0][-1]}")
+                print(result)
+                print(f"\n{choice.capitalize()} Main: {result[0][1]} {result[0][0]} CV: {result[0][-1]}")
                 for i in range(2, len(result[0]) - 1, 2):
                     print(f"{result[0][i]}:{result[0][i+1]: .2f}")
         
@@ -231,8 +232,8 @@ class Login(object):
             self.username 
         )
         if self.view_artifacts(name) == []:
-            query = '''
-                    INSERT INTO feather
+            query = f'''
+                    INSERT INTO {name}
                     (main_stat, main_stat_value,
                     substat_1_name, substat_1_value, 
                     substat_2_name, substat_2_value, 
@@ -511,7 +512,7 @@ class Roll(object):
                 while choice2 not in ['flower', 'feather', 'sands', 'goblet', 'circlet']:
                     choice2 = input("Which artifact would you like to save? Make sure you spell it correctly!\n").lower().strip()
                 self.login_class.save_artifacts(choice2, getattr(self, self.gear_map[choice2]))
-            print(f"Succesfully saved {choice2}.")
+                print(f"Succesfully saved {choice2}.")
 
 
         
