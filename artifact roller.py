@@ -6,6 +6,8 @@ class Login(object):
 
     def __init__(self):
         # self.drop()
+        self.options_for_artifacts = { "flower": "flower", "feather": "feather", "sands": "sands", "goblet": "goblet", "circlet": "circlet" }
+
         self.create_db()
         self.info()
         while not (self.login(self.username, self.password) if self.choice == '1' else self.register(self.username, self.password)):
@@ -15,8 +17,11 @@ class Login(object):
         connection = sqlite3.connect('users.db')
         cursor = connection.cursor()
         cursor.execute("DROP TABLE IF EXISTS users")
+        cursor.execute("DROP TABLE IF EXISTS flower")
         cursor.execute("DROP TABLE IF EXISTS feather")
-        cursor.execute("DROP TABLE IF EXISTS feathers")
+        cursor.execute("DROP TABLE IF EXISTS sands")
+        cursor.execute("DROP TABLE IF EXISTS goblet")
+        cursor.execute("DROP TABLE IF EXISTS circlet")
         cursor.close()
         connection.close()
 
@@ -35,11 +40,23 @@ class Login(object):
             '''
             )
         
+        self.create_artifacts('feather')
+        self.create_artifacts('flower')
+        self.create_artifacts('sands')
+        self.create_artifacts('goblet')
+        self.create_artifacts('circlet')
+        
+        connection.commit()
+        connection.close()
 
-        cursor.execute(
-            ''' 
-            CREATE TABLE IF NOT EXISTS feather (
-            user_id TEXT PRIMARY KEY NOT NULL, -- this is the same as username in users table
+    def create_artifacts(self,artifact):
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+
+        cursor.execute(f''' 
+            CREATE TABLE IF NOT EXISTS {artifact} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            user_id TEXT NOT NULL, -- this is the same as username in users table
             main_stat TEXT DEFAULT 'atk',
             main_stat_value FLOAT NOT NULL,
             substat_1_name TEXT NOT NULL,
@@ -53,10 +70,11 @@ class Login(object):
             crit_value FLOAT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(username) ON DELETE CASCADE
             )
-            '''
-        )
-        connection.commit()
-        connection.close()
+            ''')
+        conn.commit()
+        cursor.close()
+        conn.close()
+
     
     def info(self):
         self.choice = input("1.Login 2.Register\n").strip()
@@ -108,7 +126,7 @@ class Login(object):
 
 
     def menu(self):
-        choice = input("1. View resin spent \n2. Roll n times\n3. View best feather\n")
+        choice = input("1. View resin spent \n2. Roll n times\n3. View best artifacts\n")
         if choice == '1':
             conn = sqlite3.connect('users.db')
             cursor = conn.cursor()
@@ -134,12 +152,14 @@ class Login(object):
             roll.loop()
         
         elif choice == '3':
-            result = self.view_artifacts('feather')
+            choice = input("Which artifact would you like to see? type 'all' to see all your best artifacts\n").lower().strip()
+            while choice not in ['flower', 'feather', 'sands', 'goblet', 'circlet']:
+                    choice = input("Which artifact would you like to save? Make sure you spell it correctly!\n").lower().strip()
+            result = self.view_artifacts(self.options_for_artifacts[choice])
             if not result:
-                print("No feather currently saved")
+                print(f"No {choice} currently saved")
             else:
-                print(result)
-                print(f"Feather Main: {result[0][1]} {result[0][0]} CV: {result[0][-1]}")
+                print(f"{choice} Main: {result[0][1]} {result[0][0]} CV: {result[0][-1]}")
                 for i in range(2, len(result[0]) - 1, 2):
                     print(f"{result[0][i]}:{result[0][i+1]: .2f}")
         
@@ -165,17 +185,21 @@ class Login(object):
     def view_artifacts(self,name):
         conn = sqlite3.connect(f'users.db')
         cursor = conn.cursor()
-        query = f'''
-                SELECT main_stat, main_stat_value,
-                substat_1_name, substat_1_value, 
-                substat_2_name, substat_2_value,
-                substat_3_name, substat_3_value,
-                substat_4_name, substat_4_value,
-                crit_value
-                FROM {name}
-                WHERE user_id = ?
-                '''
-        result = cursor.execute(query, (self.username,)).fetchall()
+        if name == 'feather' or name == 'flower':
+            result = cursor.execute(f"SELECT * FROM {name} WHERE user_id = ? ORDER BY crit_value DESC LIMIT 1", (self.username,)).fetchone()
+            print(result)
+        else:
+            query = f'''
+                    SELECT main_stat, main_stat_value,
+                    substat_1_name, substat_1_value, 
+                    substat_2_name, substat_2_value,
+                    substat_3_name, substat_3_value,
+                    substat_4_name, substat_4_value,
+                    crit_value
+                    FROM {name}
+                    WHERE user_id = ?
+                    '''
+            result = cursor.execute(query, (self.username,)).fetchall()
 
         cursor.close()
         conn.close()
@@ -405,6 +429,8 @@ class Roll(object):
         self.stats = {"Cr": 0, "Cd": 0, "Er": 0, "Em": 0}
         self.goblet_main = goblet_main
         self.circlet_main = circlet_main
+        self.gear_map = { "flower": "flower", "feather": "feather", "sands": "sands", "goblet": "goblet", "circlet": "circlet" }
+
         
 
     def roller(self):
@@ -416,11 +442,10 @@ class Roll(object):
         if len(artifact.substats ) <= 3:
             print(artifact)
             exit() 
-        gear_map = { "flower": "flower", "feather": "feather", "sands": "sands", "goblet": "goblet", "circlet": "circlet" }
-        if gear in gear_map:
-            current_gear = getattr(self, gear_map[gear]) # this is basically "self.gear_map[gear]"
+        if gear in self.gear_map:
+            current_gear = getattr(self, self.gear_map[gear]) # this is basically "self.gear_map[gear]"
             if current_gear is None:
-                setattr(self, gear_map[gear], artifact)
+                setattr(self, self.gear_map[gear], artifact)
             elif gear == "circlet":
                 if artifact.crit_value("Cr") > current_gear.crit_value(current_gear.main) or artifact.crit_value("Cd") > current_gear.crit_value(current_gear.main):
                     setattr(self, "circlet", artifact) # self.circlet = artifact
@@ -431,7 +456,7 @@ class Roll(object):
 
 
             elif current_gear is None or artifact.crit_value() > current_gear.crit_value():
-                setattr(self, gear_map[gear], artifact)
+                setattr(self, self.gear_map[gear], artifact)
 
 
     def total_stats (self,artifact):
@@ -472,7 +497,24 @@ class Roll(object):
         self.total_stats(self.goblet) if self.goblet is not None else None
         self.total_stats(self.circlet) if self.circlet is not None else None
         self.end_stats()
-        self.login_class.save_artifacts('feather', self.feather)
+        self.save()
+
+    
+    def save(self):
+        while True:
+            choice = input("Would you like to add any of these artifacts into your saved collection? Y/N\n").lower().strip()
+            if choice == 'n' or choice == 'no':
+                return
+
+            elif choice == 'y' or choice == 'yes':
+                choice2 = input("Which artifact would you like to save?\n").lower().strip()
+                while choice2 not in ['flower', 'feather', 'sands', 'goblet', 'circlet']:
+                    choice2 = input("Which artifact would you like to save? Make sure you spell it correctly!\n").lower().strip()
+                self.login_class.save_artifacts(choice2, getattr(self, self.gear_map[choice2]))
+            print(f"Succesfully saved {choice2}.")
+
+
+        
         
 
 def main(): 
