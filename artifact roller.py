@@ -216,45 +216,35 @@ class Login(object):
         cursor = conn.cursor()
 
         query = f'''
-                UPDATE {name} 
-                SET main_stat = ?, main_stat_value = ?,
-                    substat_1_name = ?, substat_1_value = ?, 
-                    substat_2_name = ?, substat_2_value = ?, 
-                    substat_3_name = ?, substat_3_value = ?, 
-                    substat_4_name = ?, substat_4_value = ?,
-                    crit_value = ?
-                WHERE user_id = ?
-                '''
+                INSERT INTO {name}
+                (main_stat, main_stat_value,
+                substat_1_name, substat_1_value, 
+                substat_2_name, substat_2_value, 
+                substat_3_name, substat_3_value, 
+                substat_4_name, substat_4_value,
+                crit_value, user_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+            '''
+        
         li = []
-        for key,value in artifact.stats.items():
+        for key, value in artifact.stats.items():
             li.append([key, value])
+        
         values = (artifact.main, artifact.main_stats[artifact.main],
-            li[0][0], li[0][1], 
-            li[1][0], li[1][1], 
-            li[2][0], li[2][1], 
-            li[3][0], li[3][1], 
-            artifact.crit_value(artifact.main),
-            self.username 
-        )
-        if self.view_artifacts(name) == []:
-            query = f'''
-                    INSERT INTO {name}
-                    (main_stat, main_stat_value,
-                    substat_1_name, substat_1_value, 
-                    substat_2_name, substat_2_value, 
-                    substat_3_name, substat_3_value, 
-                    substat_4_name, substat_4_value,
-                    crit_value, user_id) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
-                '''
-            cursor.execute(query, values).fetchall()
-            conn.commit()
-        else:
-            cursor.execute(query, values)
-            conn.commit()
+                li[0][0], li[0][1], 
+                li[1][0], li[1][1], 
+                li[2][0], li[2][1], 
+                li[3][0], li[3][1], 
+                artifact.crit_value(artifact.main),
+                self.username)
+        
+        # Always insert a new artifact
+        cursor.execute(query, values)
+        conn.commit()
 
         cursor.close()
         conn.close()
+
     
 
 
@@ -467,7 +457,17 @@ class Roll(object):
                 i += 1
             except ValueError:
                 print("Invalid input. Please enter a valid number or 'any'.")
-        print(self.circlet_choice)
+        while True:
+            try:
+                choice = int(input("What is the minimum crit value that you would like to save for these pieces? Note only >= crit value pieces will be stored\n"))
+                if choice < 0 or choice >= 60:
+                    print("getting that crit value is impossible")
+                self.crit_amount = choice
+                break
+
+            except:
+                print("that is not a valid number")
+
 
 
     def roller(self):
@@ -484,14 +484,23 @@ class Roll(object):
             if current_gear is None:
                 setattr(self, self.gear_map[gear], artifact)
             elif gear == "sands":
+                if artifact.crit_value(self.sands_choice if self.sands_choice != 'any' else None) > self.crit_amount:
+                    self.login_class.save_artifacts("sands", artifact)
+
                 if artifact.crit_value(self.sands_choice if self.sands_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
-                    setattr(self, "sands", artifact) # self.circlet = artifact
+                    setattr(self, "sands", artifact)
             
             elif gear == "goblet":
-                if artifact.crit_value(self.goblet_choice if self.goblet_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
+                if artifact.crit_value(self.goblet_choice if self.goblet_choice != 'any' else None) >= self.crit_amount:
+                    self.login_class.save_artifacts("goblet", artifact)
+
+                if artifact.crit_value(self.goblet_choice if self.goblet_choice != 'any' else None) >= current_gear.crit_value(current_gear.main):
                     setattr(self, "goblet", artifact)
 
             elif gear == "circlet":
+                if artifact.crit_value(self.circlet_choice if self.circlet_choice != 'any' else None) >= self.crit_amount:
+                    self.login_class.save_artifacts("circlet", artifact)
+
                 if artifact.crit_value(self.circlet_choice if self.circlet_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
                     setattr(self, "circlet", artifact) # self.circlet = artifact
 
@@ -552,9 +561,6 @@ class Roll(object):
                     choice2 = input("Which artifact would you like to save? Make sure you spell it correctly!\n").lower().strip()
                 self.login_class.save_artifacts(choice2, getattr(self, self.gear_map[choice2]))
                 print(f"Succesfully saved {choice2}.")
-
-
-        
         
 
 def main(): 
@@ -563,4 +569,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
