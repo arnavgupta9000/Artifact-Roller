@@ -436,8 +436,39 @@ class Roll(object):
         self.goblet_main = goblet_main
         self.circlet_main = circlet_main
         self.gear_map = { "flower": "flower", "feather": "feather", "sands": "sands", "goblet": "goblet", "circlet": "circlet" }
-
         
+        self.sands_choice = ''
+        self.goblet_choice = ''
+        self.circlet_choice = ''
+
+        self.sands_attr = {1: "Em", 2: "Er", 3: "Def%", 4: "Atk%", 5: "Hp%"}
+        self.goblet_attr = {1: "Em", 2: "Physical DMG Bonus%", 3: "Geo DMG Bonus%", 4: "Anemo DMG Bonus%", 5: "Dendro DMG Bonus%", 6: "Hydro DMG Bonus%", 7: "Cryo DMG Bonus%", 8: "Electro DMG Bonus%", 9: "Pyro DMG Bonus%", 10: "Def%", 11: "Atk%", 12: "Hp%"}
+        self.circlet_attr = {1: "Em", 2: "Healing Bonus%", 3: "Cd", 4: "Cr", 5: "Def%", 6: "Atk%", 7: "Hp%"}
+        self.choose_main(0)
+
+    
+    def choose_main(self, i):
+        attributes = [
+            ("sands", self.sands_attr),
+            ("goblet", self.goblet_attr),
+            ("circlet", self.circlet_attr)
+        ]
+
+        while i < len(attributes):
+            attr_name, attr_dict = attributes[i]
+            try:
+                choice = input(f"Enter a main {attr_name} stat you would like. Put 'any' for any stat {attr_dict}\n")
+                if choice == 'any':
+                    setattr(self, f"{attr_name}_choice", 'any')
+                elif int(choice) not in attr_dict.keys():
+                    continue
+                else:
+                    setattr(self, f"{attr_name}_choice", attr_dict[int(choice)])
+                i += 1
+            except ValueError:
+                print("Invalid input. Please enter a valid number or 'any'.")
+        print(self.circlet_choice)
+
 
     def roller(self):
         return {0: "flower", 1: "feather", 2:"sands", 3: "goblet", 4: "circlet"}[random.randint(0,4)]
@@ -452,16 +483,19 @@ class Roll(object):
             current_gear = getattr(self, self.gear_map[gear]) # this is basically "self.gear_map[gear]"
             if current_gear is None:
                 setattr(self, self.gear_map[gear], artifact)
-            elif gear == "circlet":
-                if artifact.crit_value("Cr") > current_gear.crit_value(current_gear.main) or artifact.crit_value("Cd") > current_gear.crit_value(current_gear.main):
-                    setattr(self, "circlet", artifact) # self.circlet = artifact
+            elif gear == "sands":
+                if artifact.crit_value(self.sands_choice if self.sands_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
+                    setattr(self, "sands", artifact) # self.circlet = artifact
             
             elif gear == "goblet":
-                if artifact.crit_value("Pyro DMG Bonus%") > current_gear.crit_value(current_gear.main):
+                if artifact.crit_value(self.goblet_choice if self.goblet_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
                     setattr(self, "goblet", artifact)
 
+            elif gear == "circlet":
+                if artifact.crit_value(self.circlet_choice if self.circlet_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
+                    setattr(self, "circlet", artifact) # self.circlet = artifact
 
-            elif current_gear is None or artifact.crit_value() > current_gear.crit_value():
+            elif current_gear is None or artifact.crit_value() > current_gear.crit_value(): # for flowers and feathers
                 setattr(self, self.gear_map[gear], artifact)
 
 
