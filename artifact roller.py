@@ -1,10 +1,12 @@
 import random
 import sqlite3
 import hashlib
+import math
 
 class Login(object):
 
     def __init__(self):
+        self.save_one = False
         # self.drop()
         self.options_for_artifacts = { "flower": "flower", "feather": "feather", "sands": "sands", "goblet": "goblet", "circlet": "circlet" }
 
@@ -24,7 +26,6 @@ class Login(object):
         cursor.execute("DROP TABLE IF EXISTS circlet")
         cursor.close()
         connection.close()
-
 
 
     def create_db(self):
@@ -126,7 +127,7 @@ class Login(object):
 
 
     def menu(self):
-        choice = input("1. View resin spent \n2. Roll n times\n3. View best artifacts\n")
+        choice = input("1. View resin spent \n2. Roll n times\n3. View best artifacts\n4. turn on/off 'save best only'\n5. View leaderboards for top resin used\n")
         if choice == '1':
             conn = sqlite3.connect('users.db')
             cursor = conn.cursor()
@@ -162,8 +163,43 @@ class Login(object):
                 print(f"\n{choice.capitalize()} Main: {result[2]} {result[3]} CV: {result[-1]}")
                 for i in range(4, len(result) - 1, 2):
                     print(f"{result[i]}:{result[i+1]: .2f}")
+        elif choice == '4':
+            self.save_one = not self.save_one
+            print(f"you have turned {'off' if self.save_one else 'on'} save many artifacts")
+        
+        elif choice == '5':
+            self.resin_leaderboards()
         
         self.menu()
+    
+    def resin_leaderboards(self):
+        while True:
+            try:
+                amount = int(input("How many top resin users would you like to see?\n"))
+                if amount <= 0 or amount > 100:
+                    print("You must enter a number between 1-100\n")
+                else:
+                    break
+            except:
+                print("please enter a number")
+        
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+        query = f'''
+                SELECT username, resin_used 
+                FROM users 
+                ORDER BY resin_used DESC 
+                LIMIT {amount};
+                '''
+        result = cursor.execute(query, ()).fetchall()
+        for i in range(len(result)):
+                print(f"User {result[i][0]} has spent a total of {result[i][1]} resin! Thats a total of {math.floor(result[i][1] / 200): .0f} Days!!")
+        print()
+
+        cursor.close()
+        conn.close()
+
+
         
 
     def add_resin(self, amount):
@@ -211,9 +247,30 @@ class Login(object):
         conn.close()
         return result
 
-    def save_artifacts(self, name, artifact):
+    def save_artifacts(self, name, artifact, going_for = None):
         conn = sqlite3.connect('users.db')
         cursor = conn.cursor()
+
+        def search(conn, cursor):
+            where_clause = 'WHERE main_stat = ?' if going_for is not None else ''
+            query = f'''
+                SELECT crit_value 
+                FROM {name} 
+                {where_clause}
+                ORDER BY crit_value DESC 
+                LIMIT 1
+            '''
+
+            if going_for is not None:
+                res = cursor.execute(query, (going_for,)).fetchone()
+                return res[0] if res is not None else 0
+            return 0
+            #else:
+            #    res = cursor.execute(query).fetchone()
+
+            return res[0] if res is not None else 0
+        if self.save_one and(search(conn, cursor) > artifact.crit_value(artifact.main)):
+            return
 
         query = f'''
                 INSERT INTO {name}
@@ -238,14 +295,11 @@ class Login(object):
                 artifact.crit_value(artifact.main),
                 self.username)
         
-        # Always insert a new artifact
         cursor.execute(query, values)
         conn.commit()
 
         cursor.close()
         conn.close()
-
-    
 
 
 class Artifact(object):
@@ -448,7 +502,7 @@ class Roll(object):
             attr_name, attr_dict = attributes[i]
             try:
                 choice = input(f"Enter a main {attr_name} stat you would like. Put 'any' for any stat {attr_dict}\n")
-                if choice == 'any':
+                if choice == 'any' or choice == 'a':
                     setattr(self, f"{attr_name}_choice", 'any')
                 elif int(choice) not in attr_dict.keys():
                     continue
@@ -469,7 +523,6 @@ class Roll(object):
                 print("that is not a valid number")
 
 
-
     def roller(self):
         return {0: "flower", 1: "feather", 2:"sands", 3: "goblet", 4: "circlet"}[random.randint(0,4)]
 
@@ -485,27 +538,34 @@ class Roll(object):
                 setattr(self, self.gear_map[gear], artifact)
             elif gear == "sands":
                 if artifact.crit_value(self.sands_choice if self.sands_choice != 'any' else None) > self.crit_amount:
-                    self.login_class.save_artifacts("sands", artifact)
+                    self.login_class.save_artifacts("sands", artifact, self.sands_choice)
 
                 if artifact.crit_value(self.sands_choice if self.sands_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
                     setattr(self, "sands", artifact)
             
             elif gear == "goblet":
                 if artifact.crit_value(self.goblet_choice if self.goblet_choice != 'any' else None) >= self.crit_amount:
-                    self.login_class.save_artifacts("goblet", artifact)
+                    self.login_class.save_artifacts("goblet", artifact, self.goblet_choice)
 
                 if artifact.crit_value(self.goblet_choice if self.goblet_choice != 'any' else None) >= current_gear.crit_value(current_gear.main):
                     setattr(self, "goblet", artifact)
 
             elif gear == "circlet":
                 if artifact.crit_value(self.circlet_choice if self.circlet_choice != 'any' else None) >= self.crit_amount:
-                    self.login_class.save_artifacts("circlet", artifact)
+                    self.login_class.save_artifacts("circlet", artifact,self.circlet_choice)
 
                 if artifact.crit_value(self.circlet_choice if self.circlet_choice != 'any' else None) > current_gear.crit_value(current_gear.main):
                     setattr(self, "circlet", artifact) # self.circlet = artifact
 
-            elif current_gear is None or artifact.crit_value() > current_gear.crit_value(): # for flowers and feathers
-                setattr(self, self.gear_map[gear], artifact)
+            # elif current_gear is None or artifact.crit_value() > current_gear.crit_value(): # for flowers and feathers
+            #     setattr(self, self.gear_map[gear], artifact)
+            
+            elif gear == "flower":
+                if artifact.crit_value(artifact.main) > current_gear.crit_value(current_gear.main):
+                    self.login_class.save_artifacts("flower", artifact)
+            elif gear == "feather":
+                 if artifact.crit_value(artifact.main) > current_gear.crit_value(current_gear.main):
+                    self.login_class.save_artifacts("feather", artifact, )
 
 
     def total_stats (self,artifact):
