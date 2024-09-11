@@ -154,7 +154,7 @@ class Login(object):
         
         elif choice == '3':
             choice = input("Which artifact would you like to see? type 'all' to see all your best artifacts\n").lower().strip()
-            while choice not in ['flower', 'feather', 'sands', 'goblet', 'circlet']:
+            while choice not in ['flower', 'feather', 'sands', 'goblet', 'circlet', 'all']:
                     choice = input("Which artifact would you like to save? Make sure you spell it correctly!\n").lower().strip()
             result = self.view_artifacts(self.options_for_artifacts[choice],True)
             if not result:
@@ -200,8 +200,6 @@ class Login(object):
         conn.close()
 
 
-        
-
     def add_resin(self, amount):
         conn = sqlite3.connect('users.db')
         cursor = conn.cursor()
@@ -225,7 +223,7 @@ class Login(object):
             if name == 'feather' or name == 'flower':
                 search = 'Atk' if name == 'feather' else 'Hp'
             else:
-                choice = input("What main stat would you like to see that has the best CV\n")
+                choice = input(f"What main stat would you like to see that has the best CV for {name}\n")
                 search = choice
             result = cursor.execute(f'''SELECT * FROM {name} WHERE user_id = ? 
                                     ORDER BY 
